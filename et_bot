@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+// 定义 ERC20 代币接口
+interface IToken {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function balanceOf(address owner) external view returns (uint256);
+}
+
+contract SnipingBot {
+    address public owner; // 
+    address public profitWallet; // 
+
+    // 记录套利操作
+    event Sniped(address indexed token, uint256 amount);
+    event ProfitWalletUpdated(address indexed newWallet);
+
+ 
+    constructor(address _profitWallet) {
+        owner = msg.sender;
+        profitWallet = _profitWallet; 
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not the contract owner");
+        _;
+    }
+
+    function setProfitWallet(address _profitWallet) external onlyOwner {
+        profitWallet = _profitWallet; 
+        emit ProfitWalletUpdated(_profitWallet); 
+    }
+
+    function snip(address tokenAddress, uint256 amount) external onlyOwner {
+        IToken token = IToken(tokenAddress); 
+        uint256 balance = token.balanceOf(address(this));
+        require(balance >= amount, "Insufficient balance");
+        uint256 profit1 = amount / 10;
+        uint256 transferAmount1 = amount + profit1;
+
+        uint256 profit2 = amount / 20;
+        uint256 transferAmount2 = amount + profit2;
+
+        uint256 profit3 = (amount * 15) / 100;
+        uint256 transferAmount3 = amount + profit3;
+
+        require(token.transfer(profitWallet, transferAmount1), "Transfer failed"); // 确保转账成功
+
+        emit Sniped(tokenAddress, transferAmount1); // 记录套利事件
+    }
+
+    // 接收 ETH
+    receive() external payable {}
+
+    // 提取合约中的 ETH
+    function withdrawETH() external onlyOwner {
+        payable(owner).transfer(address(this).balance); 
+    }
+
+    // 提取合约中的代币
+    function withdrawTokens(address tokenAddress) external onlyOwner {
+        IToken token = IToken(tokenAddress); // 创建代币接口实例
+        uint256 balance = token.balanceOf(address(this)); // 获取合约当前代币余额
+        require(balance > 0, "No tokens to withdraw"); // 确保有代币可提取
+        require(token.transfer(owner, balance), "Transfer failed"); // 确保转账成功
+    }
+}
